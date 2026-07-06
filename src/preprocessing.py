@@ -87,7 +87,8 @@ def perform_structural_cleansing(df_dict):
 
                 # Drop flagged rows by keeping only what is NOT (~) European
                 df_clean = df_clean[~is_european]
-
+# --- NEUER CODE: Wandle die verbleibenden sauberen Texte in echte Zahlen um ---
+                df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce')
         final_rows = df_clean.shape[0]
         print(
             f"Company {key} Cleansing: Removed {initial_rows - final_rows} invalid rows. Remaining: {final_rows}")
