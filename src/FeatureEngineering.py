@@ -18,10 +18,7 @@ def create_features_company_a(df):
     df_features.insert(insert_pos, 'Unique Order Identifier', unique_id)
 
     # Unique Product Identifier
-    unique_product_id = (
-        df_features['Supplier'].astype(str) + '-' +
-        df_features['Product Article Number'].astype('Int64').astype(str)
-    )
+    unique_product_id = df_features['Product Article Number'].astype('Int64').astype(str)
     insert_pos = df_features.columns.get_loc('Product Article Number') + 1
     df_features.insert(insert_pos, 'Unique Product Identifier', unique_product_id)
 
@@ -94,10 +91,7 @@ def create_features_company_b(df):
     df_features.insert(insert_pos, 'Unique Order Identifier', unique_id)
 
     # Unique Product Identifier
-    unique_product_id = (
-        df_features['Supplier'].astype(str) + '-' +
-        df_features['Product Article Number'].astype(str)
-    )
+    unique_product_id = df_features['Product Article Number'].astype(str)
     insert_pos = df_features.columns.get_loc('Product Article Number') + 1
     df_features.insert(insert_pos, 'Unique Product Identifier', unique_product_id)
 
