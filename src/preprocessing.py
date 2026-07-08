@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 from IPython.display import display
 
 # load function for 3.
+
+
 def load_procurement(path):
     df = pd.read_csv(path, sep=";")
     for col in ["Planned Delivery Date", "Arrival Date", "Original Desired Date"]:
@@ -16,6 +18,8 @@ def load_procurement(path):
     return df
 
 # checks data format fr quantity columns for mixed localization formats and text-based corruption. Prints a report of the findings.
+
+
 def audit_column_formats(df_dict, columns_to_check):
     """
     Scans specified columns and classifies the data format of every row to 
@@ -57,6 +61,8 @@ def audit_column_formats(df_dict, columns_to_check):
                 print(f"      -> SAMPLES FOUND: {garbage_samples}")
 
 # Removes duplicates and rows missing critical temporal/volumetric data. This is after step 4. .  After cleansing, prints the number of rows removed and remaining for each company.
+
+
 def perform_structural_cleansing(df_dict):
 
     cleaned_dict = {}
@@ -96,8 +102,115 @@ def perform_structural_cleansing(df_dict):
 
     return cleaned_dict
 
+
+def plot_univariate_scatter(df_dict):
+    """
+    Iterates through a dictionary of DataFrames and generates univariate 
+    scatter plots to identify absolute anomalies prior to feature engineering.
+    """
+    for key, df in df_dict.items():
+        # Setup visualization grid (2 rows, 2 columns)
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        fig.suptitle(
+            f'Univariate Scatter Analysis: Company {key}', fontsize=14)
+
+        # Plot 1: Ordered Quantity
+        if 'Ordered Quantity' in df.columns:
+            axes[0, 0].scatter(df.index, df['Ordered Quantity'],
+                               alpha=0.5, color='steelblue', marker='.')
+            axes[0, 0].set_title('Ordered Quantity')
+            axes[0, 0].set_ylabel('Quantity')
+            axes[0, 0].set_xlabel('Row Index')
+
+        # Plot 2: Delivered Quantity
+        if 'Delivered Quantity' in df.columns:
+            axes[0, 1].scatter(df.index, df['Delivered Quantity'],
+                               alpha=0.5, color='mediumseagreen', marker='.')
+            axes[0, 1].set_title('Delivered Quantity')
+            axes[0, 1].set_ylabel('Quantity')
+            axes[0, 1].set_xlabel('Row Index')
+
+        # Plot 3: Planned Delivery Date
+        if 'Planned Delivery Date' in df.columns:
+            axes[1, 0].scatter(df.index, df['Planned Delivery Date'],
+                               alpha=0.5, color='purple', marker='.')
+            axes[1, 0].set_title('Planned Delivery Date')
+            axes[1, 0].set_ylabel('Date')
+            axes[1, 0].set_xlabel('Row Index')
+
+        # Plot 4: Arrival Date
+        if 'Arrival Date' in df.columns:
+            axes[1, 1].scatter(df.index, df['Arrival Date'],
+                               alpha=0.5, color='darkorange', marker='.')
+            axes[1, 1].set_title('Arrival Date')
+            axes[1, 1].set_ylabel('Date')
+            axes[1, 1].set_xlabel('Row Index')
+
+        plt.tight_layout()
+        plt.show()
+    print("Company B - Absolute Max Ordered Quantity:",
+          data_clean_1["B"]['Ordered Quantity'].max())
+    print("Company B - Absolute Max Delivered Quantity:",
+          data_clean_1["B"]['Delivered Quantity'].max())
+
+
+def plot_isolated_deltas(df_dict):
+    """
+    Generates a 2x2 grid of univariate scatter plots isolating the 
+    Quantity Delta and Delivery Time Delta for Companies A and B.
+    """
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    fig.suptitle(
+        'Isolated Anomaly Detection: Fulfillment and Temporal Deltas', fontsize=16)
+
+    for row_idx, (key, df) in enumerate(df_dict.items()):
+        # Define required columns for mathematical delta calculations
+        required_cols = ['Planned Delivery Date', 'Arrival Date',
+                         'Ordered Quantity', 'Delivered Quantity']
+
+        # Verify columns exist before computation
+        if all(col in df.columns for col in required_cols):
+            # Isolate valid rows to prevent NaN computation errors
+            valid_data = df.dropna(subset=required_cols).copy()
+
+            # 1. Calculate Quantity Delta (Positive = Under-delivery, Negative = Over-delivery)
+            valid_data['Quantity_Delta'] = valid_data['Ordered Quantity'] - \
+                valid_data['Delivered Quantity']
+
+            # 2. Calculate Delivery Time Delta (Positive = Late, Negative = Early)
+            valid_data['Delivery_Delay_Days'] = (
+                valid_data['Arrival Date'] - valid_data['Planned Delivery Date']).dt.days
+
+            # Plot 1: Quantity Delta (Column 0)
+            axes[row_idx, 0].scatter(valid_data.index, valid_data['Quantity_Delta'],
+                                     alpha=0.5, color='darkmagenta', marker='.')
+            axes[row_idx, 0].set_title(
+                f'Company {key}: Quantity Delta (Ordered - Delivered)')
+            axes[row_idx, 0].set_ylabel('Quantity Difference')
+            axes[row_idx, 0].set_xlabel('Row Index')
+            axes[row_idx, 0].axhline(
+                0, color='black', linestyle='-', linewidth=1.5, label='Exact Fulfillment')
+            axes[row_idx, 0].legend()
+            axes[row_idx, 0].grid(True, alpha=0.3)
+
+            # Plot 2: Delivery Time Delta (Column 1)
+            axes[row_idx, 1].scatter(valid_data.index, valid_data['Delivery_Delay_Days'],
+                                     alpha=0.5, color='crimson', marker='.')
+            axes[row_idx, 1].set_title(
+                f'Company {key}: Delivery Time Delta (Days)')
+            axes[row_idx, 1].set_ylabel('Delay in Days')
+            axes[row_idx, 1].set_xlabel('Row Index')
+            axes[row_idx, 1].axhline(
+                0, color='black', linestyle='-', linewidth=1.5, label='On Time')
+            axes[row_idx, 1].legend()
+            axes[row_idx, 1].grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
 # After initial monovariat plot
 # Executes secondary data cleansing by applying domain-specific volumetric and chronological threshold filters mapped to individual companies.
+
+
 def data_cleansing_2(df_dict):
 
     cleaned_dict = {}
@@ -148,7 +261,7 @@ def data_cleansing_2(df_dict):
     return cleaned_dict
 
 
-#After bivariate plot
+# After bivariate plot
 # setting boundries on delays and quantity.
 def data_clean_3(df_dict):
 
@@ -187,6 +300,54 @@ def data_clean_3(df_dict):
         cleaned_dict[key] = df_transformed
 
     return cleaned_dict
+
+
+def visualize_order_consistency(df_dict, company_key):
+    """
+    KDD Phase: Exploratory Data Analysis
+    Verifies if Order Numbers have consistent chronological dates 
+    before aggregation is permitted.
+    """
+    df = df_dict[company_key].copy()
+
+    if 'Order Number' not in df.columns:
+        print(
+            f"Company {company_key} lacks an 'Order Number' column for this grouping.")
+        return
+
+    # 1. Count unique dates per Order Number
+    date_variance = df.groupby('Order Number').agg(
+        Unique_Planned=('Planned Delivery Date', 'nunique'),
+        Unique_Arrival=('Arrival Date', 'nunique')
+    )
+
+    # 2. Check for Split Deliveries (Orders with >1 unique arrival date)
+    split_deliveries = date_variance[date_variance['Unique_Arrival'] > 1]
+
+    print(f"--- Company {company_key} Order Consistency Audit ---")
+    print(f"Total Unique Orders: {len(date_variance)}")
+    print(
+        f"Orders with Split Deliveries (>1 Arrival Date): {len(split_deliveries)}")
+
+    # 3. Visualization
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+    date_variance['Unique_Planned'].value_counts().sort_index().plot(
+        kind='bar', ax=axes[0], color='steelblue', edgecolor='black'
+    )
+    axes[0].set_title('Unique Planned Dates per Order')
+    axes[0].set_xlabel('Number of Unique Dates')
+    axes[0].set_ylabel('Order Count')
+
+    date_variance['Unique_Arrival'].value_counts().sort_index().plot(
+        kind='bar', ax=axes[1], color='darkorange', edgecolor='black'
+    )
+    axes[1].set_title('Unique Arrival Dates per Order')
+    axes[1].set_xlabel('Number of Unique Dates')
+
+    plt.tight_layout()
+    plt.show()
+
 
 def get_supplier_metrics(df_dict, company_key, min_orders=30):
     """
@@ -452,4 +613,3 @@ def analyze_temporal_trends(df_dict, company_key):
     axes[1].axhline(avg_day_late, color='red', linestyle='--',
                     linewidth=1.5, label=f'Overall Avg ({avg_day_late:.1f}%)')
     axes
-
