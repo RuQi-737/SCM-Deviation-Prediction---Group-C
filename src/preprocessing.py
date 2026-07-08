@@ -64,10 +64,8 @@ def audit_column_formats(df_dict, columns_to_check):
 
 
 def perform_structural_cleansing(df_dict):
-
     cleaned_dict = {}
 
-    # Added 'Product Article number' to the list of required columns
     required_columns = ['Product Article number', 'Planned Delivery Date',
                         'Arrival Date', 'Ordered Quantity', 'Delivered Quantity']
     volume_columns = ['Ordered Quantity', 'Delivered Quantity']
@@ -79,25 +77,33 @@ def perform_structural_cleansing(df_dict):
         # 1. Drop rows with missing values in required columns
         available_columns = [
             col for col in required_columns if col in df_clean.columns]
-        df_clean = df_clean.dropna(subset=available_columns)
+        df_clean = df_clean.dropna(subset=available_columns).copy()
 
-        # 2. Filter out European Data Formats
+        # 2. Filter out European Data Formats (SKIPPED for Company B)
+        if key != 'B':
+            for col in volume_columns:
+                if col in df_clean.columns:
+                    raw_strings = df_clean[col].astype(str)
+                    # Flag strings that contain a comma OR have more than one dot
+                    is_european = raw_strings.str.contains(
+                        r',', na=False) | (raw_strings.str.count(r'\.') > 1)
+                    # Drop flagged rows by keeping only what is NOT (~) European
+                    df_clean = df_clean[~is_european]
+
+        # 3. Convert quantities to float64 (Forces standard decimal math for ALL)
         for col in volume_columns:
             if col in df_clean.columns:
-                # Cast safely to string for regex scanning
-                raw_strings = df_clean[col].astype(str)
+                # errors='coerce' turns empty strings or true garbage text into NaN
+                df_clean[col] = pd.to_numeric(
+                    df_clean[col], errors='coerce').astype('float64')
 
-                # Flag strings that contain a comma OR have more than one dot
-                is_european = raw_strings.str.contains(
-                    r',', na=False) | (raw_strings.str.count(r'\.') > 1)
+        # Drop any rows that became NaN during the float conversion
+        df_clean = df_clean.dropna(subset=available_columns)
 
-                # Drop flagged rows by keeping only what is NOT (~) European
-                df_clean = df_clean[~is_european]
-# --- NEUER CODE: Wandle die verbleibenden sauberen Texte in echte Zahlen um ---
-                df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce')
         final_rows = df_clean.shape[0]
         print(
             f"Company {key} Cleansing: Removed {initial_rows - final_rows} invalid rows. Remaining: {final_rows}")
+
         cleaned_dict[key] = df_clean
 
     return cleaned_dict
@@ -148,10 +154,6 @@ def plot_univariate_scatter(df_dict):
 
         plt.tight_layout()
         plt.show()
-    print("Company B - Absolute Max Ordered Quantity:",
-          data_clean_1["B"]['Ordered Quantity'].max())
-    print("Company B - Absolute Max Delivered Quantity:",
-          data_clean_1["B"]['Delivered Quantity'].max())
 
 
 def plot_isolated_deltas(df_dict):
@@ -264,38 +266,37 @@ def data_cleansing_2(df_dict):
 # After bivariate plot
 # setting boundries on delays and quantity.
 def data_clean_3(df_dict):
-
     cleaned_dict = {}
 
     for key, df in df_dict.items():
         initial_rows = df.shape[0]
         df_transformed = df.copy()
 
-        # --- COMPANY A SPECIFIC FILTERS () ---
+        # --- COMPANY A SPECIFIC FILTERS (unchanged) ---
         if key == 'A':
-            # 1. Cap Quantity at 250
             if 'Ordered Quantity' in df_transformed.columns:
                 df_transformed['Ordered Quantity'] = df_transformed['Ordered Quantity'].clip(
                     upper=250)
 
-        # --- COMPANY B SPECIFIC FILTERS () ---
+        # --- COMPANY B SPECIFIC FILTERS (deletion instead of capping) ---
         elif key == 'B':
-            # 1. Cap Quantity at 10,000
+            # 1. Delete rows where Ordered Quantity exceeds 10,000 (was silently clipped before)
             if 'Ordered Quantity' in df_transformed.columns:
-                df_transformed['Ordered Quantity'] = df_transformed['Ordered Quantity'].clip(
-                    upper=10000)
+                df_transformed = df_transformed[df_transformed['Ordered Quantity'] <= 10000]
 
-            # 2. Cap Delivery Delta between -30 and +400 days
-            if 'Delivery_Delay_Days' in df_transformed.columns:
-                df_transformed['Delivery_Delay_Days'] = df_transformed['Delivery_Delay_Days'].clip(
-                    lower=-30, upper=400)
+            # 2. Delete deliveries more than 30 days early or more than 400 days late.
+            #    Computed fresh here (rather than relying on a downstream column name
+            #    that never matched) so the filter actually fires.
+            if 'Arrival Date' in df_transformed.columns and 'Planned Delivery Date' in df_transformed.columns:
+                delay = (df_transformed['Arrival Date'] -
+                         df_transformed['Planned Delivery Date']).dt.days
+                df_transformed = df_transformed[(
+                    delay >= -30) & (delay <= 400)]
 
         # --- METRICS & RETURN ---
         final_rows = df_transformed.shape[0]
-
-        # Validation print matching your style (Note: Winsorization does not drop rows)
         print(
-            f"Company {key}: Capped extreme values. Total rows maintained: {final_rows}")
+            f"Company {key}: Removed {initial_rows - final_rows} rows via threshold filtering. Remaining: {final_rows}")
 
         cleaned_dict[key] = df_transformed
 
