@@ -421,7 +421,8 @@ def analyze_quantity_delay_correlation(df_dict, company_key):
     available_cols = [col for col in cols if col in df.columns]
 
     if len(available_cols) > 1:
-        corr_matrix = df[available_cols].corr()
+        # corr_matrix = df[available_cols].corr()
+        corr_matrix = df[available_cols].corr(method='spearman')
         print(f"--- Company {company_key}: Correlation Matrix ---")
         display(corr_matrix.round(3))
 
@@ -508,12 +509,14 @@ def visualize_comprehensive_correlations(df_dict, company_key):
         f"========== Company {company_key}: Multivariate Visualization ==========")
 
     # 2. Correlation Heatmap (Pure Matplotlib)
-    corr_matrix = order_level.corr()
+    # corr_matrix = order_level.corr()
+    corr_matrix = order_level.corr(method='spearman')
+    # fig.colorbar(cax, label='Spearman Correlation')
     fig, ax = plt.subplots(figsize=(7, 5))
 
     # Create the color mesh
     cax = ax.imshow(corr_matrix, cmap='coolwarm', vmin=-1, vmax=1)
-    fig.colorbar(cax, label='Pearson Correlation')
+    fig.colorbar(cax, label='Spearman Correlation')
 
     # Set labels
     ax.set_xticks(range(len(corr_matrix.columns)))
